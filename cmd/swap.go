@@ -16,9 +16,9 @@ var swapCmd = &cobra.Command{
 	Long: `. For example:
 
 1011 0110 -> 0110 1101 	# swap bits
-ABCD 			-> BADC 			# swap bytes
-ABCD 			-> CDAB 			# swap words
-ABCDEFGH 	-> EFGHABCD		# swap dwords
+ABCD 			-> BADC 			# swap half 
+ABCD 			-> CDAB 			# swap word
+ABCDEFGH 	-> EFGHABCD		# swap dword
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("swap called")
