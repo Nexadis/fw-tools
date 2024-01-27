@@ -43,3 +43,41 @@ func TestSwapHalf(t *testing.T) {
 		})
 	}
 }
+
+func TestSwapWord(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  uint16
+		want uint16
+	}{
+		{
+			name: "Simple swap word",
+			arg:  0xABCD,
+			want: 0xCDAB,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, swapWord(test.arg))
+		})
+	}
+}
+
+func TestSwapDWord(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  uint32
+		want uint32
+	}{
+		{
+			name: "Simple swap word",
+			arg:  0xABCD1234,
+			want: 0x1234ABCD,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, swapDWord(test.arg))
+		})
+	}
+}

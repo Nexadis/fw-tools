@@ -28,3 +28,15 @@ func swapHalf(h uint8) uint8 {
 	bot := (h & 0x0F) << 4
 	return top + bot
 }
+
+func swapWord(w uint16) uint16 {
+	top := (w & 0xFF00) >> 8
+	bot := (w & 0x00FF) << 8
+	return top + bot
+}
+
+func swapDWord(d uint32) uint32 {
+	top := (d & 0xFFFF0000) >> 16
+	bot := (d & 0x0000FFFF) << 16
+	return top + bot
+}
