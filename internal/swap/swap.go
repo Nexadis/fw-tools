@@ -22,7 +22,12 @@ func (s Swapper) Swap(i io.Reader, o io.Writer) error {
 		}
 		if s.Config.Bits {
 			for i, b := range buf {
-				buf[i] = InverseBits(uint8(b))
+				buf[i] = InverseBits(b)
+			}
+		}
+		if s.Config.Halfs {
+			for i, b := range buf {
+				buf[i] = SwapHalf(b)
 			}
 		}
 		_, err := o.Write(buf[:n])

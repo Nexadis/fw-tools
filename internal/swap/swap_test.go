@@ -123,6 +123,16 @@ func TestSwap(t *testing.T) {
 			},
 			bytes.Repeat([]byte{0b1011_0011, 0b1101_0101, 0b1000_1010}, 10),
 		},
+		{
+			"Inverse half only",
+			config.Swap{
+				Halfs: true,
+			},
+			func() io.Reader {
+				return bytes.NewReader(bytes.Repeat([]byte{0b1100_1101, 0b1010_1011, 0b0101_0001}, 10))
+			},
+			bytes.Repeat([]byte{0b1101_1100, 0b1011_1010, 0b0001_0101}, 10),
+		},
 	}
 	for _, tn := range tests {
 		t.Run(tn.name, func(t *testing.T) {
