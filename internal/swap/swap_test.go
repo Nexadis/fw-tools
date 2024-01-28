@@ -3,6 +3,7 @@ package swap
 import (
 	"bytes"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -254,6 +255,64 @@ func TestCheckLen(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+		})
+	}
+
+}
+
+func TestRun(t *testing.T) {
+	tests := []struct {
+		name    string
+		conf    config.Swap
+		in      []byte
+		out     []byte
+		wantErr bool
+	}{
+		{
+			"Test byte file",
+			config.Swap{
+				Bits:  true,
+				Halfs: true,
+			},
+			bytes.Repeat([]byte{0b1010_1011}, 0x40000),
+			bytes.Repeat([]byte{0b0101_1101}, 0x40000),
+			false,
+		},
+		{
+			"Test word and dword",
+			config.Swap{
+				Bytes: true,
+				Words: true,
+			},
+			bytes.Repeat([]byte{0xAD, 0xEF, 0x01, 0x23}, 0x40000),
+			bytes.Repeat([]byte{0x23, 0x01, 0xEF, 0xAD}, 0x40000),
+			false,
+		},
+	}
+
+	for _, tn := range tests {
+		t.Run(tn.name, func(t *testing.T) {
+			inname := os.TempDir() + "/test_in.bin"
+			outname := os.TempDir() + "/test_out.bin"
+
+			s := Swapper{
+				Input:  inname,
+				Output: outname,
+				Config: tn.conf,
+			}
+			err := os.WriteFile(inname, tn.in, 0777)
+			require.NoError(t, err)
+
+			err = s.Run()
+			if tn.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			data, err := os.ReadFile(outname)
+			require.NoError(t, err)
+			assert.Equal(t, tn.out, data)
 
 		})
 	}

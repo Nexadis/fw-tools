@@ -55,6 +55,7 @@ func (s Swapper) Swap(i io.Reader, o io.Writer) error {
 				binary.BigEndian.PutUint32(buf[i:i+4], w)
 			}
 		}
+
 		if s.Config.Dwords {
 			var w uint64
 			for i := 0; i < len(buf); i += 8 {
@@ -106,6 +107,7 @@ func (s Swapper) Run() error {
 	defer out.Close()
 	bufin := bufio.NewReader(in)
 	bufout := bufio.NewWriter(out)
+	defer bufout.Flush()
 	return s.Swap(bufin, bufout)
 }
 
