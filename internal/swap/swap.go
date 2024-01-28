@@ -2,6 +2,7 @@ package swap
 
 import (
 	"bufio"
+	"encoding/binary"
 	"io"
 	"os"
 
@@ -20,16 +21,28 @@ func (s Swapper) Swap(i io.Reader, o io.Writer) error {
 		if err != nil && err != io.EOF {
 			return err
 		}
+
 		if s.Config.Bits {
 			for i, b := range buf {
 				buf[i] = InverseBits(b)
 			}
 		}
+
 		if s.Config.Halfs {
 			for i, b := range buf {
 				buf[i] = SwapHalf(b)
 			}
 		}
+
+		if s.Config.Bytes {
+			var w uint16
+			for i := 0; i < len(buf); i += 2 {
+				w = binary.BigEndian.Uint16(buf[i : i+2])
+				w = SwapBytes(w)
+				binary.BigEndian.PutUint16(buf[i:i+2], w)
+			}
+		}
+
 		_, err := o.Write(buf[:n])
 		if err != nil {
 			return err
