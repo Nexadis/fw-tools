@@ -177,3 +177,85 @@ func TestSwap(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckLen(t *testing.T) {
+	tests := []struct {
+		name    string
+		conf    config.Swap
+		len     int64
+		wantErr bool
+	}{
+		{
+			"No align",
+			config.Swap{
+				Bits:  true,
+				Halfs: true,
+			},
+			123,
+			false,
+		},
+		{
+			"Invalid Align word",
+			config.Swap{
+				Bytes: true,
+			},
+			123,
+			true,
+		},
+		{
+			"Valid Align word",
+			config.Swap{
+				Bytes: true,
+			},
+			122,
+			false,
+		},
+		{
+			"Invalid Align dword",
+			config.Swap{
+				Words: true,
+			},
+			6,
+			true,
+		},
+		{
+			"Valid Align dword",
+			config.Swap{
+				Words: true,
+			},
+			8,
+			false,
+		},
+		{
+			"Invalid Align qword",
+			config.Swap{
+				Dwords: true,
+			},
+			12,
+			true,
+		},
+		{
+			"Valid Align qword",
+			config.Swap{
+				Dwords: true,
+			},
+			16,
+			false,
+		},
+	}
+	for _, tn := range tests {
+		t.Run(tn.name, func(t *testing.T) {
+			s := Swapper{
+				Config: tn.conf,
+			}
+			err := s.checkLen(tn.len)
+			if tn.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+		})
+	}
+
+}
