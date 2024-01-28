@@ -143,6 +143,16 @@ func TestSwap(t *testing.T) {
 			},
 			bytes.Repeat([]byte{0x02, 0x01, 0x04, 0x03}, 10),
 		},
+		{
+			"Inverse words only",
+			config.Swap{
+				Words: true,
+			},
+			func() io.Reader {
+				return bytes.NewReader(bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x04}, 10))
+			},
+			bytes.Repeat([]byte{0x03, 0x04, 0x01, 0x02}, 10),
+		},
 	}
 	for _, tn := range tests {
 		t.Run(tn.name, func(t *testing.T) {
