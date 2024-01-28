@@ -3,11 +3,15 @@ package swap
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/Nexadis/fw-tools/internal/config"
 )
+
+var ErrAlign = errors.New("invalid align of input")
 
 type Swapper struct {
 	Input  string
@@ -68,12 +72,33 @@ func (s Swapper) Swap(i io.Reader, o io.Writer) error {
 	return nil
 }
 
+func (s Swapper) checkLen(size int64) error {
+	if s.Config.Bytes && size%2 != 0 {
+		return fmt.Errorf("%w: should 2", ErrAlign)
+	}
+	if s.Config.Words && size%4 != 0 {
+		return fmt.Errorf("%w: should 4", ErrAlign)
+	}
+	if s.Config.Dwords && size%8 != 0 {
+		return fmt.Errorf("%w: should 8", ErrAlign)
+	}
+	return nil
+
+}
+
 func (s Swapper) Run() error {
 	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0755)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
+
+	finfo, _ := in.Stat()
+	err = s.checkLen(finfo.Size())
+	if err != nil {
+		return err
+	}
+
 	out, err := os.OpenFile(s.Output, os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
 		return err
