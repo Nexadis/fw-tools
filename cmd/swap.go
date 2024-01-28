@@ -15,10 +15,11 @@ var swapCmd = &cobra.Command{
 	Short: "Swap bits in byte, or bytes in word, or words in dword",
 	Long: `. For example:
 
-1011 0110 -> 0110 1101 	# swap bits
-ABCD 			-> BADC 			# swap half 
-ABCD 			-> CDAB 			# swap word
-ABCD1234 	-> 1234ABCD		# swap dword
+	1011 0110 -> 0110 1101 	# inverse bits
+	ABCD 			-> BADC 			# swap halfs
+	ABCD 			-> CDAB 			# swap bytes
+	ABCD1234 	-> 1234ABCD		# swap words
+	ABCD1234567890EF -> 0x567890EFABCD1234 # swap dwords
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("swap called")

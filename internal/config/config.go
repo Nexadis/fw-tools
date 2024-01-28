@@ -23,6 +23,7 @@ type Merge struct {
 type Swap struct {
 	Bits   bool
 	Halfs  bool
+	Bytes  bool
 	Words  bool
 	Dwords bool
 }
