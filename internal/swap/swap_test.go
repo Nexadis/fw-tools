@@ -2,6 +2,7 @@ package swap
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -295,6 +296,8 @@ func TestRun(t *testing.T) {
 		t.Run(tn.name, func(t *testing.T) {
 			inname := os.TempDir() + "/test_in.bin"
 			outname := os.TempDir() + "/test_out.bin"
+			defer os.Remove(inname)
+			defer os.Remove(outname)
 
 			s := Swapper{
 				Input:  inname,
@@ -315,6 +318,67 @@ func TestRun(t *testing.T) {
 			assert.Equal(t, tn.out, data)
 
 		})
+	}
+
+}
+
+func BenchmarkRun(b *testing.B) {
+	tests := []struct {
+		name    string
+		conf    config.Swap
+		in      []byte
+		out     []byte
+		wantErr bool
+	}{
+		{
+			"Bench byte file",
+			config.Swap{
+				Bits:  true,
+				Halfs: true,
+			},
+			[]byte{0b1010_1011},
+			[]byte{0b0101_1101},
+			false,
+		},
+		{
+			"Bench word and dword file",
+			config.Swap{
+				Bytes: true,
+				Words: true,
+			},
+			[]byte{0xAD, 0xEF, 0x01, 0x23},
+			[]byte{0x23, 0x01, 0xEF, 0xAD},
+			false,
+		},
+	}
+
+	for _, tn := range tests {
+		sizes := []int{0x100, 0x1000, 0x10000, 0x100_000}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", tn.name, size), func(b *testing.B) {
+				inname := os.TempDir() + "/test_in.bin"
+				outname := os.TempDir() + "/test_out.bin"
+				defer os.Remove(inname)
+				defer os.Remove(outname)
+
+				f, _ := os.OpenFile(inname, os.O_CREATE|os.O_WRONLY, 0755)
+				for i := 0; i < size; i++ {
+					f.Write(tn.in)
+				}
+				f.Close()
+				b.ResetTimer()
+				s := Swapper{
+					Input:  inname,
+					Output: outname,
+					Config: tn.conf,
+				}
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					s.Run()
+				}
+
+			})
+		}
 	}
 
 }
