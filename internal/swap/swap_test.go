@@ -299,11 +299,13 @@ func TestRun(t *testing.T) {
 			false,
 		},
 	}
+	inname := os.TempDir() + "/test_in.bin"
+	outname := os.TempDir() + "/test_out.bin"
+	os.Remove(inname)
+	os.Remove(outname)
 
 	for _, tn := range tests {
 		t.Run(tn.name, func(t *testing.T) {
-			inname := os.TempDir() + "/test_in.bin"
-			outname := os.TempDir() + "/test_out.bin"
 			defer os.Remove(inname)
 			defer os.Remove(outname)
 
@@ -335,7 +337,6 @@ func BenchmarkRun(b *testing.B) {
 		name    string
 		conf    config.Swap
 		in      []byte
-		out     []byte
 		wantErr bool
 	}{
 		{
@@ -345,7 +346,6 @@ func BenchmarkRun(b *testing.B) {
 				Halfs: true,
 			},
 			[]byte{0b1010_1011},
-			[]byte{0b0101_1101},
 			false,
 		},
 		{
@@ -354,18 +354,19 @@ func BenchmarkRun(b *testing.B) {
 				Bytes: true,
 				Words: true,
 			},
-			[]byte{0xAD, 0xEF, 0x01, 0x23},
-			[]byte{0x23, 0x01, 0xEF, 0xAD},
+			[]byte{0xAD},
 			false,
 		},
 	}
+	inname := os.TempDir() + "/test_in.bin"
+	outname := os.TempDir() + "/test_out.bin"
+	os.Remove(inname)
+	os.Remove(outname)
 
 	for _, tn := range tests {
 		sizes := []int{KiB, MiB, 10 * MiB, 100 * MiB, 1 * GiB}
 		for _, size := range sizes {
 			b.Run(fmt.Sprintf("%s_%d", tn.name, size), func(b *testing.B) {
-				inname := os.TempDir() + "/test_in.bin"
-				outname := os.TempDir() + "/test_out.bin"
 				defer os.Remove(inname)
 				defer os.Remove(outname)
 
