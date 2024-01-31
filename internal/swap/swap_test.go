@@ -13,6 +13,14 @@ import (
 	"github.com/Nexadis/fw-tools/internal/config"
 )
 
+const (
+	_ = 1 << (10 * iota)
+	KiB
+	MiB
+	GiB
+	TiB
+)
+
 func TestInverseBits(t *testing.T) {
 	tests := []struct {
 		name string
@@ -353,7 +361,7 @@ func BenchmarkRun(b *testing.B) {
 	}
 
 	for _, tn := range tests {
-		sizes := []int{0x100, 0x1000, 0x10000, 0x100_000}
+		sizes := []int{KiB, MiB, 10 * MiB, 100 * MiB, 1 * GiB}
 		for _, size := range sizes {
 			b.Run(fmt.Sprintf("%s_%d", tn.name, size), func(b *testing.B) {
 				inname := os.TempDir() + "/test_in.bin"
@@ -362,16 +370,14 @@ func BenchmarkRun(b *testing.B) {
 				defer os.Remove(outname)
 
 				f, _ := os.OpenFile(inname, os.O_CREATE|os.O_WRONLY, 0755)
-				for i := 0; i < size; i++ {
-					f.Write(tn.in)
-				}
+				f.Write(bytes.Repeat(tn.in, size))
 				f.Close()
-				b.ResetTimer()
 				s := Swapper{
 					Input:  inname,
 					Output: outname,
 					Config: tn.conf,
 				}
+				b.Log("end prepare")
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					s.Run()
