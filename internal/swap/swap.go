@@ -20,7 +20,7 @@ type Swapper struct {
 }
 
 func (s Swapper) Swap(i io.Reader, o io.Writer) error {
-	buf := make([]byte, 8)
+	buf := make([]byte, 0x10)
 	for n, err := i.Read(buf); n != 0; n, err = i.Read(buf) {
 		if err != nil && err != io.EOF {
 			return err
@@ -60,7 +60,7 @@ func (s Swapper) Swap(i io.Reader, o io.Writer) error {
 			var w uint64
 			for i := 0; i < len(buf); i += 8 {
 				w = binary.BigEndian.Uint64(buf[i : i+8])
-				w = SwapDwords(w)
+				w = SwapUInt(w)
 				binary.BigEndian.PutUint64(buf[i:i+8], w)
 			}
 		}
@@ -138,8 +138,16 @@ func SwapWords(d uint32) uint32 {
 	return top + bot
 }
 
-func SwapDwords(q uint64) uint64 {
-	top := (q & 0xFFFFFFFF00000000) >> 32
-	bot := (q & 0x00000000FFFFFFFF) << 32
+func SwapDwords(b []byte) {
+	beg := [4]byte{}
+	copy(beg[:], b[:4])
+	copy(b[:4], b[4:8])
+	copy(b[4:8], beg[:])
+}
+
+func SwapUInt(d uint64) uint64 {
+	top := (d & 0xFFFFFFFF00000000) >> 32
+	bot := (d & 0x00000000FFFFFFFF) << 32
 	return top + bot
+
 }

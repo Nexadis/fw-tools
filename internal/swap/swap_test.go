@@ -2,6 +2,7 @@ package swap
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -100,18 +101,19 @@ func TestSwapWord(t *testing.T) {
 func TestSwapDWord(t *testing.T) {
 	tests := []struct {
 		name string
-		arg  uint64
-		want uint64
+		arg  []byte
+		want []byte
 	}{
 		{
 			name: "Simple swap dword",
-			arg:  0xABCD1234567890EF,
-			want: 0x567890EFABCD1234,
+			arg:  []byte{0xAB, 0xCD, 0x12, 0x34, 0x56, 0x78, 0x90, 0xEF},
+			want: []byte{0x56, 0x78, 0x90, 0xEF, 0xAB, 0xCD, 0x12, 0x34},
 		},
 	}
 	for _, tn := range tests {
 		t.Run(tn.name, func(t *testing.T) {
-			assert.Equal(t, tn.want, SwapDwords(tn.arg))
+			SwapDwords(tn.arg)
+			assert.Equal(t, tn.want, tn.arg)
 		})
 	}
 }
@@ -388,4 +390,92 @@ func BenchmarkRun(b *testing.B) {
 		}
 	}
 
+}
+
+func BenchmarkSwapDwords(b *testing.B) {
+	tests := []struct {
+		name string
+		size int
+	}{
+		{
+			"Byte slice Swap 1MiB",
+			1 * MiB,
+		},
+		{
+			"Byte slice Swap 100MiB",
+			100 * MiB,
+		},
+		{
+			"Byte slice Swap 1GiB",
+			1 * GiB,
+		},
+	}
+	for _, tn := range tests {
+		b.Run(tn.name, func(b *testing.B) {
+			data := bytes.Repeat([]byte{0xFA}, tn.size)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				SwapDwords(data)
+			}
+
+		})
+	}
+	utests := []struct {
+		name     string
+		sizeFile int
+		bufSize  int
+	}{
+		{
+			"Uint Swap 1MiB",
+			1 * MiB,
+			8,
+		},
+		{
+			"Uint Swap 100MiB",
+			100 * MiB,
+			8,
+		},
+		{
+			"Uint Swap 1GiB buf=8",
+			1 * GiB,
+			0x8,
+		},
+		{
+			"Uint Swap 1GiB buf=0x100",
+			1 * GiB,
+			0x100,
+		},
+		{
+			"Uint Swap 1GiB buf=0x400",
+			1 * GiB,
+			0x400,
+		},
+		{
+			"Uint Swap 1GiB buf=0x1000",
+			1 * GiB,
+			0x1000,
+		},
+	}
+	for _, tn := range utests {
+		b.Run(tn.name, func(b *testing.B) {
+			data := bytes.Repeat([]byte{0xFA}, tn.sizeFile)
+			r := bytes.NewReader(data)
+			buf := make([]byte, tn.bufSize)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for n, err := r.Read(buf); n != 0; n, err = r.Read(buf) {
+					if err != nil && err != io.EOF {
+						return
+					}
+					var w uint64
+					for i := 0; i < len(buf); i += 8 {
+						w = binary.BigEndian.Uint64(buf[i : i+8])
+						w = SwapUInt(w)
+						binary.BigEndian.PutUint64(buf[i:i+8], w)
+					}
+				}
+			}
+		})
+	}
 }
