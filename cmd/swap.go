@@ -50,11 +50,11 @@ var swapCmd = &cobra.Command{
 }
 
 func init() {
-	swapCmd.Flags().BoolVarP(&swapCfg.Bits, "bits", "ib", false, "Inverse bits in byte")
-	swapCmd.Flags().BoolVarP(&swapCfg.Halfs, "halfs", "h", false, "Swap halfs of byte")
-	swapCmd.Flags().BoolVarP(&swapCfg.Bytes, "bytes", "sb", false, "Swap neighbors bytes")
+	swapCmd.Flags().BoolVarP(&swapCfg.Bits, "bits", "", false, "Inverse bits in byte")
+	swapCmd.Flags().BoolVarP(&swapCfg.Halfs, "halfs", "", false, "Swap halfs of byte")
+	swapCmd.Flags().BoolVarP(&swapCfg.Bytes, "bytes", "b", false, "Swap neighbors bytes")
 	swapCmd.Flags().BoolVarP(&swapCfg.Words, "words", "w", false, "Swap neighbors words")
-	swapCmd.Flags().BoolVarP(&swapCfg.Dwords, "dwords", "dw", false, "Swap neighbors dwords")
+	swapCmd.Flags().BoolVarP(&swapCfg.Dwords, "dwords", "d", false, "Swap neighbors dwords")
 
 	rootCmd.AddCommand(swapCmd)
 
