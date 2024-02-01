@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/Nexadis/fw-tools/internal/config"
 )
@@ -88,6 +89,26 @@ func (s Swapper) checkLen(size int64) error {
 }
 
 func (s Swapper) Run() error {
+	if s.Output == "" {
+		name, _ := strings.CutSuffix(s.Input, ".bin")
+		if s.Config.Bits {
+			name += "-bits"
+		}
+		if s.Config.Halfs {
+			name += "-halfs"
+		}
+		if s.Config.Bytes {
+			name += "-bytes"
+		}
+		if s.Config.Words {
+			name += "-words"
+		}
+		if s.Config.Dwords {
+			name += "-dwords"
+		}
+		name += ".bin"
+		s.Output = name
+	}
 	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0755)
 	if err != nil {
 		return err
