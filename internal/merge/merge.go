@@ -76,6 +76,7 @@ func (m *Merger) mergeSize(ctx context.Context, size int) error {
 			}
 			if n == 0 {
 				empties += 1
+				continue
 			}
 			m.output.Write(b)
 		}
