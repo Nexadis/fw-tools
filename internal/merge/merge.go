@@ -88,9 +88,6 @@ func (m *Merger) bits(ctx context.Context) error {
 	b := make([]byte, len(m.inputs))
 	var empties int
 	for {
-		if empties == len(m.inputs) {
-			return nil
-		}
 		for i, r := range m.inputs {
 			n, err := r.Read(b[i : i+1])
 			if err != nil && err != io.EOF {
@@ -98,7 +95,11 @@ func (m *Merger) bits(ctx context.Context) error {
 			}
 			if n == 0 {
 				empties += 1
+				continue
 			}
+		}
+		if empties == len(m.inputs) {
+			return nil
 		}
 		out := make([]byte, len(m.inputs))
 		num_bit := 0
@@ -106,9 +107,10 @@ func (m *Merger) bits(ctx context.Context) error {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(1 << bit)
 			for _, file_byte := range b {
-				bv := (file_byte & mask) << byte(num_bit)
+				bv := ((file_byte & mask) >> bit) << byte(num_bit)
 				out[cur_byte] |= bv
-				if num_bit == 7 {
+				num_bit++
+				if num_bit == 8 {
 					cur_byte += 1
 					num_bit = 0
 				}

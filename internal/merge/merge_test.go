@@ -197,14 +197,30 @@ func TestMerger_bits(t *testing.T) {
 			func() *Merger {
 				m := &Merger{}
 				m.inputs = []io.Reader{
-					bytes.NewReader([]byte{0b1111_0000}),
+					bytes.NewReader([]byte{0b1111_1010}),
 					bytes.NewReader([]byte{0b0000_1111}),
 				}
 				return m
 			},
 			args{nil},
-			bytes.NewBuffer(make([]byte, 0, 4)),
-			[]byte{0b0101_0101, 0b1010_1010},
+			bytes.NewBuffer(make([]byte, 0, 2)),
+			[]byte{0b1110_1110, 0b0101_0101},
+			false,
+		},
+		{
+			"Merge two files bit by bit",
+			func() *Merger {
+				m := &Merger{}
+				m.inputs = []io.Reader{
+					bytes.NewReader([]byte{0b1111_1010}),
+					bytes.NewReader([]byte{0b0000_1111}),
+					bytes.NewReader([]byte{0b0000_1111}),
+				}
+				return m
+			},
+			args{nil},
+			bytes.NewBuffer(make([]byte, 0, 3)),
+			[]byte{0b1011_1110, 0b1001_1111, 0b0010_0100},
 			false,
 		},
 	}
