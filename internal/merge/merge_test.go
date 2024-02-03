@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -22,7 +23,11 @@ func TestNew(t *testing.T) {
 		args args
 		want *Merger
 	}{
-		// TODO: Add test cases.
+		{
+			"Simple new",
+			args{config.Merge{}},
+			New(config.Merge{}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -33,45 +38,63 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestMerger_Open(t *testing.T) {
-	type args struct {
-		inputs []string
-		output string
-	}
-	tests := []struct {
-		name    string
-		m       *Merger
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err, _ := tt.m.Open(tt.args.inputs, tt.args.output); (err != nil) != tt.wantErr {
-				t.Errorf("Merger.Open() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestMerger_Run(t *testing.T) {
 	type args struct {
-		ctx context.Context
+		ctx    context.Context
+		input1 string
+		input2 string
 	}
 	tests := []struct {
 		name    string
-		m       *Merger
+		prepare func() *Merger
 		args    args
+		out     []byte
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			"Split by byte 2 files",
+			func() *Merger {
+				cfg := config.Merge{
+					ByByte: true,
+				}
+
+				m := New(cfg)
+				return m
+			},
+			args{
+				nil,
+				"abcdefgh",
+				"12345678",
+			},
+			[]byte("a1b2c3d4e5f6g7h8"),
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.m.Run(tt.args.ctx); (err != nil) != tt.wantErr {
+			var m *Merger
+			if tt.prepare != nil {
+				m = tt.prepare()
+			}
+			f1, _ := os.CreateTemp("", "*.bin")
+			f1.Write([]byte(tt.args.input1))
+			f1.Close()
+			f2, _ := os.CreateTemp("", "*.bin")
+			f2.Write([]byte(tt.args.input2))
+			f2.Close()
+			inputs := []string{f1.Name(), f2.Name()}
+			fo, _ := os.CreateTemp("", "*.bin")
+			fo.Close()
+			output := fo.Name()
+			err, cls := m.Open(inputs, output)
+			require.NoError(t, err)
+			if err := m.Run(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Merger.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			cls()
+			data, err := os.ReadFile(output)
+			require.NoError(t, err)
+			require.Equal(t, tt.out, data)
 		})
 	}
 }
