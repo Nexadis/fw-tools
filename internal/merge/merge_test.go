@@ -41,8 +41,8 @@ func TestNew(t *testing.T) {
 func TestMerger_Run(t *testing.T) {
 	type args struct {
 		ctx    context.Context
-		input1 string
-		input2 string
+		input1 []byte
+		input2 []byte
 	}
 	tests := []struct {
 		name    string
@@ -63,10 +63,28 @@ func TestMerger_Run(t *testing.T) {
 			},
 			args{
 				nil,
-				"abcdefgh",
-				"12345678",
+				[]byte("abcdefgh"),
+				[]byte("12345678"),
 			},
 			[]byte("a1b2c3d4e5f6g7h8"),
+			false,
+		},
+		{
+			"Split by bit 2 files",
+			func() *Merger {
+				cfg := config.Merge{
+					ByBit: true,
+				}
+
+				m := New(cfg)
+				return m
+			},
+			args{
+				nil,
+				[]byte{0b1010_1010, 0b0101_0101},
+				[]byte{0b0101_0101, 0b1010_1010},
+			},
+			[]byte{0b0110_0110, 0b0110_0110, 0b1001_1001, 0b1001_1001},
 			false,
 		},
 	}
