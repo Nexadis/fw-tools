@@ -3,6 +3,7 @@ package merge
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,29 +23,37 @@ func New(cfg config.Merge) *Merger {
 	}
 }
 
-func (m *Merger) Open(inputs []string, output string) error {
+func (m *Merger) Open(inputs []string, output string) (error, func() error) {
 	var size int64 = -1
 	m.inputs = make([]io.Reader, 0, len(inputs))
 	for _, i := range inputs {
 		in, err := os.Open(i)
 		if err != nil {
-			return fmt.Errorf("can't open file for merging: %w", err)
+			return fmt.Errorf("can't open file for merging: %w", err), nil
 		}
 		s, err := in.Stat()
 		if err != nil {
-			return fmt.Errorf("can't open file for merging: %w", err)
+			return fmt.Errorf("can't open file for merging: %w", err), nil
 		}
 		if size == -1 {
 			size = s.Size()
 		}
 		if size != s.Size() {
-			return fmt.Errorf("size of file is not same, problem with:%s", s.Name())
+			return fmt.Errorf("size of file is not same, problem with:%s", s.Name()), nil
 		}
 		m.inputs = append(m.inputs, bufio.NewReader(in))
 	}
+	if output == "" {
+		output = "merged.bin"
+	}
 	o, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0766)
-	m.output = bufio.NewWriter(o)
-	return err
+	w := bufio.NewWriter(o)
+	m.output = w
+	closeF := func() error {
+		return w.Flush()
+
+	}
+	return err, closeF
 }
 
 func (m *Merger) Run(ctx context.Context) error {
@@ -58,7 +67,7 @@ func (m *Merger) Run(ctx context.Context) error {
 	case m.Config.ByDword:
 		return m.mergeSize(ctx, 4)
 	default:
-		panic("unexpected mode")
+		return errors.New("unexpected mode, choose one")
 	}
 }
 
