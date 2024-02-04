@@ -4,20 +4,18 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"context"
 	"errors"
 	"log"
 
 	"github.com/spf13/cobra"
 
-	"github.com/Nexadis/fw-tools/internal/config"
 	"github.com/Nexadis/fw-tools/internal/swap"
 )
 
-var swapCfg config.Swap
-
 // swapCmd represents the swap command
 var swapCmd = &cobra.Command{
-	Use:   "swap [filename] [filename2]...",
+	Use:   "swap filename [filename2]...",
 	Short: "Swap bits in byte, or bytes in word, or words in dword",
 	Long: `Swap bits in byte, or bytes in word, or words in dword. For example:
 
@@ -39,9 +37,9 @@ var swapCmd = &cobra.Command{
 			s := swap.Swapper{
 				Input:  input,
 				Output: cfg.Output,
-				Config: swapCfg,
+				Config: cfg.Swap,
 			}
-			err := s.Run()
+			err := s.Run(context.TODO())
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -50,11 +48,11 @@ var swapCmd = &cobra.Command{
 }
 
 func init() {
-	swapCmd.Flags().BoolVarP(&swapCfg.Bits, "bits", "", false, "Inverse bits in byte")
-	swapCmd.Flags().BoolVarP(&swapCfg.Halfs, "halfs", "", false, "Swap halfs of byte")
-	swapCmd.Flags().BoolVarP(&swapCfg.Bytes, "bytes", "b", false, "Swap neighbors bytes")
-	swapCmd.Flags().BoolVarP(&swapCfg.Words, "words", "w", false, "Swap neighbors words")
-	swapCmd.Flags().BoolVarP(&swapCfg.Dwords, "dwords", "d", false, "Swap neighbors dwords")
+	swapCmd.Flags().BoolVarP(&cfg.Swap.Bits, "bits", "", false, "Inverse bits in byte")
+	swapCmd.Flags().BoolVarP(&cfg.Swap.Halfs, "halfs", "", false, "Swap halfs of byte")
+	swapCmd.Flags().BoolVarP(&cfg.Swap.Bytes, "bytes", "b", false, "Swap neighbors bytes")
+	swapCmd.Flags().BoolVarP(&cfg.Swap.Words, "words", "w", false, "Swap neighbors words")
+	swapCmd.Flags().BoolVarP(&cfg.Swap.Dwords, "dwords", "d", false, "Swap neighbors dwords")
 
 	rootCmd.AddCommand(swapCmd)
 
