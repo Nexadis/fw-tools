@@ -2,6 +2,7 @@ package swap
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -182,7 +183,7 @@ func TestSwap(t *testing.T) {
 				Config: tn.conf,
 			}
 			buf := bytes.NewBuffer(make([]byte, 0, len(tn.want)))
-			err := s.Swap(tn.prepare(), buf)
+			err := s.Swap(context.TODO(), tn.prepare(), buf)
 			require.NoError(t, err)
 			require.Equal(t, tn.want, buf.Bytes())
 
@@ -319,7 +320,7 @@ func TestRun(t *testing.T) {
 			err := os.WriteFile(inname, tn.in, 0777)
 			require.NoError(t, err)
 
-			err = s.Run()
+			err = s.Run(context.TODO())
 			if tn.wantErr {
 				require.Error(t, err)
 				return
@@ -383,7 +384,7 @@ func BenchmarkRun(b *testing.B) {
 				b.Log("end prepare")
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					s.Run()
+					s.Run(context.TODO())
 				}
 
 			})

@@ -2,6 +2,7 @@ package swap
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -20,11 +21,16 @@ type Swapper struct {
 	Config config.Swap
 }
 
-func (s Swapper) Swap(i io.Reader, o io.Writer) error {
+func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
 	buf := make([]byte, 0x10)
 	for n, err := i.Read(buf); n != 0; n, err = i.Read(buf) {
 		if err != nil && err != io.EOF {
 			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
 		if s.Config.Bits {
@@ -88,7 +94,7 @@ func (s Swapper) checkLen(size int64) error {
 
 }
 
-func (s Swapper) Run() error {
+func (s Swapper) Run(ctx context.Context) error {
 	if s.Output == "" {
 		name, _ := strings.CutSuffix(s.Input, ".bin")
 		if s.Config.Bits {
@@ -109,7 +115,7 @@ func (s Swapper) Run() error {
 		name += ".bin"
 		s.Output = name
 	}
-	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0755)
+	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0766)
 	if err != nil {
 		return err
 	}
@@ -121,7 +127,7 @@ func (s Swapper) Run() error {
 		return err
 	}
 
-	out, err := os.OpenFile(s.Output, os.O_CREATE|os.O_WRONLY, 0755)
+	out, err := os.OpenFile(s.Output, os.O_CREATE|os.O_WRONLY, 0766)
 	if err != nil {
 		return err
 	}
@@ -129,7 +135,8 @@ func (s Swapper) Run() error {
 	bufin := bufio.NewReader(in)
 	bufout := bufio.NewWriter(out)
 	defer bufout.Flush()
-	return s.Swap(bufin, bufout)
+
+	return s.Swap(ctx, bufin, bufout)
 }
 
 func InverseBits(b uint8) uint8 {
