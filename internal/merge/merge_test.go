@@ -62,7 +62,7 @@ func TestMerger_Run(t *testing.T) {
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				[]byte("abcdefgh"),
 				[]byte("12345678"),
 			},
@@ -80,7 +80,7 @@ func TestMerger_Run(t *testing.T) {
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				[]byte{0b1010_1010, 0b0101_0101},
 				[]byte{0b0101_0101, 0b1010_1010},
 			},
@@ -104,12 +104,12 @@ func TestMerger_Run(t *testing.T) {
 			fo, _ := os.CreateTemp("", "*.bin")
 			fo.Close()
 			output := fo.Name()
-			err, cls := m.Open(inputs, output)
+			err := m.Open(inputs, output)
 			require.NoError(t, err)
 			if err := m.Run(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Merger.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			cls()
+			require.NoError(t, m.Close())
 			data, err := os.ReadFile(output)
 			require.NoError(t, err)
 			require.Equal(t, tt.out, data)
@@ -117,7 +117,7 @@ func TestMerger_Run(t *testing.T) {
 	}
 }
 
-func TestMerger_mergeSize(t *testing.T) {
+func TestMerger_bytes(t *testing.T) {
 	type args struct {
 		ctx  context.Context
 		size int
@@ -134,14 +134,14 @@ func TestMerger_mergeSize(t *testing.T) {
 			"Merge two files byte by byte",
 			func() *Merger {
 				m := &Merger{}
-				m.inputs = []io.Reader{
-					strings.NewReader("abcd"),
-					strings.NewReader("1234"),
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(strings.NewReader("abcd")),
+					io.NopCloser(strings.NewReader("1234")),
 				}
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				1,
 			},
 			bytes.NewBuffer(make([]byte, 0, 8)),
@@ -152,15 +152,15 @@ func TestMerger_mergeSize(t *testing.T) {
 			"Merge three files byte by byte",
 			func() *Merger {
 				m := &Merger{}
-				m.inputs = []io.Reader{
-					strings.NewReader("abcd"),
-					strings.NewReader("1234"),
-					strings.NewReader("zxcv"),
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(strings.NewReader("abcd")),
+					io.NopCloser(strings.NewReader("1234")),
+					io.NopCloser(strings.NewReader("zxcv")),
 				}
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				1,
 			},
 			bytes.NewBuffer(make([]byte, 0, 12)),
@@ -171,15 +171,15 @@ func TestMerger_mergeSize(t *testing.T) {
 			"Merge three files word by word",
 			func() *Merger {
 				m := &Merger{}
-				m.inputs = []io.Reader{
-					strings.NewReader("abcd"),
-					strings.NewReader("1234"),
-					strings.NewReader("zxcv"),
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(strings.NewReader("abcd")),
+					io.NopCloser(strings.NewReader("1234")),
+					io.NopCloser(strings.NewReader("zxcv")),
 				}
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				2,
 			},
 			bytes.NewBuffer(make([]byte, 0, 12)),
@@ -190,15 +190,15 @@ func TestMerger_mergeSize(t *testing.T) {
 			"Merge three files dword by dword",
 			func() *Merger {
 				m := &Merger{}
-				m.inputs = []io.Reader{
-					strings.NewReader("abcddcba"),
-					strings.NewReader("12344321"),
-					strings.NewReader("zxcvvcxz"),
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(strings.NewReader("abcddcba")),
+					io.NopCloser(strings.NewReader("12344321")),
+					io.NopCloser(strings.NewReader("zxcvvcxz")),
 				}
 				return m
 			},
 			args{
-				nil,
+				context.TODO(),
 				4,
 			},
 			bytes.NewBuffer(make([]byte, 0, 24)),
@@ -209,8 +209,8 @@ func TestMerger_mergeSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.prepare()
-			m.output = tt.out
-			if err := m.mergeSize(tt.args.ctx, tt.args.size); (err != nil) != tt.wantErr {
+			m.output = NopWCloser(tt.out)
+			if err := m.bytes(tt.args.ctx, tt.args.size); (err != nil) != tt.wantErr {
 				t.Errorf("Merger.mergeSize() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
@@ -236,31 +236,31 @@ func TestMerger_bits(t *testing.T) {
 		{
 			"Merge two files bit by bit",
 			func() *Merger {
-				m := &Merger{}
-				m.inputs = []io.Reader{
-					bytes.NewReader([]byte{0b1111_1010}),
-					bytes.NewReader([]byte{0b0000_1111}),
+				m := New(config.Merge{ByBit: true})
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(bytes.NewReader([]byte{0b1111_1010})),
+					io.NopCloser(bytes.NewReader([]byte{0b0000_1111})),
 				}
 				return m
 			},
-			args{nil},
-			bytes.NewBuffer(make([]byte, 0, 2)),
+			args{context.TODO()},
+			&bytes.Buffer{},
 			[]byte{0b1110_1110, 0b0101_0101},
 			false,
 		},
 		{
 			"Merge two files bit by bit",
 			func() *Merger {
-				m := &Merger{}
-				m.inputs = []io.Reader{
-					bytes.NewReader([]byte{0b1111_1010}),
-					bytes.NewReader([]byte{0b0000_1111}),
-					bytes.NewReader([]byte{0b0000_1111}),
+				m := New(config.Merge{ByBit: true})
+				m.inputs = []io.ReadCloser{
+					io.NopCloser(bytes.NewReader([]byte{0b1111_1010})),
+					io.NopCloser(bytes.NewReader([]byte{0b0000_1111})),
+					io.NopCloser(bytes.NewReader([]byte{0b0000_1111})),
 				}
 				return m
 			},
-			args{nil},
-			bytes.NewBuffer(make([]byte, 0, 3)),
+			args{context.TODO()},
+			&bytes.Buffer{},
 			[]byte{0b1011_1110, 0b1001_1111, 0b0010_0100},
 			false,
 		},
@@ -268,7 +268,7 @@ func TestMerger_bits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.prepare()
-			m.output = tt.out
+			m.output = NopWCloser(tt.out)
 			if err := m.bits(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Merger.bits() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -278,4 +278,17 @@ func TestMerger_bits(t *testing.T) {
 			require.Equal(t, tt.want, tt.out.Bytes())
 		})
 	}
+}
+
+type nopCloser struct {
+	io.Writer
+}
+
+func (nc *nopCloser) Close() error {
+	return nil
+}
+
+func NopWCloser(w io.Writer) io.WriteCloser {
+	return &nopCloser{w}
+
 }

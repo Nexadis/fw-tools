@@ -51,17 +51,17 @@ func (c *Cutter) Close() error {
 func (c *Cutter) Run(ctx context.Context) error {
 	skip := io.Discard
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		n, err := io.CopyN(c.output, c.input, int64(c.Config.Page))
 		if err != nil && err != io.EOF {
 			return err
 		}
 		if n == 0 {
 			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
 		}
 		io.CopyN(skip, c.input, int64(c.Config.Skip))
 	}

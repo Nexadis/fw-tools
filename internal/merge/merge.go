@@ -1,7 +1,6 @@
 package merge
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -12,8 +11,8 @@ import (
 )
 
 type Merger struct {
-	inputs []io.Reader
-	output io.Writer
+	inputs []io.ReadCloser
+	output io.WriteCloser
 	Config config.Merge
 }
 
@@ -23,37 +22,47 @@ func New(cfg config.Merge) *Merger {
 	}
 }
 
-func (m *Merger) Open(inputs []string, output string) (error, func() error) {
+func (m *Merger) Open(inputs []string, output string) error {
+	// size - size of file, must be the same for all files
 	var size int64 = -1
-	m.inputs = make([]io.Reader, 0, len(inputs))
+	m.inputs = make([]io.ReadCloser, 0, len(inputs))
 	for _, i := range inputs {
 		in, err := os.Open(i)
 		if err != nil {
-			return fmt.Errorf("can't open file for merging: %w", err), nil
+			return fmt.Errorf("can't open file for merging: %w", err)
 		}
 		s, err := in.Stat()
 		if err != nil {
-			return fmt.Errorf("can't open file for merging: %w", err), nil
+			return fmt.Errorf("can't get file stat for merging: %w", err)
 		}
+
+		// save size of first file
 		if size == -1 {
 			size = s.Size()
 		}
+
+		// file with alternative size
 		if size != s.Size() {
-			return fmt.Errorf("size of file is not same, problem with:%s", s.Name()), nil
+			return fmt.Errorf("size of file is not same, problem with:%s", s.Name())
 		}
-		m.inputs = append(m.inputs, bufio.NewReader(in))
+		m.inputs = append(m.inputs, in)
 	}
 	if output == "" {
 		output = "merged.bin"
 	}
 	o, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0766)
-	w := bufio.NewWriter(o)
-	m.output = w
-	closeF := func() error {
-		return w.Flush()
+	m.output = o
+	return err
+}
 
+func (m *Merger) Close() error {
+	for _, i := range m.inputs {
+		err := i.Close()
+		if err != nil {
+			return err
+		}
 	}
-	return err, closeF
+	return m.output.Close()
 }
 
 func (m *Merger) Run(ctx context.Context) error {
@@ -61,68 +70,64 @@ func (m *Merger) Run(ctx context.Context) error {
 	case m.Config.ByBit:
 		return m.bits(ctx)
 	case m.Config.ByByte:
-		return m.mergeSize(ctx, 1)
+		return m.bytes(ctx, 1)
 	case m.Config.ByWord:
-		return m.mergeSize(ctx, 2)
+		return m.bytes(ctx, 2)
 	case m.Config.ByDword:
-		return m.mergeSize(ctx, 4)
+		return m.bytes(ctx, 4)
 	default:
 		return errors.New("unexpected mode, choose one")
 	}
 }
 
-func (m *Merger) mergeSize(ctx context.Context, size int) error {
-	b := make([]byte, size)
-	var empties int
+func (m *Merger) bytes(ctx context.Context, size int) error {
 	for {
-		if empties == len(m.inputs) {
-			return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 		for _, i := range m.inputs {
-			n, err := i.Read(b)
+			n, err := io.CopyN(m.output, i, int64(size))
 			if err != nil && err != io.EOF {
 				return err
 			}
+			// first empty reader, all the same size
 			if n == 0 {
-				empties += 1
-				continue
+				return nil
 			}
-			m.output.Write(b)
 		}
 	}
 
 }
 
 func (m *Merger) bits(ctx context.Context) error {
-	b := make([]byte, len(m.inputs))
-	var empties int
+	bPerInput := make([]byte, len(m.inputs))
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		for i, r := range m.inputs {
-			n, err := r.Read(b[i : i+1])
+			n, err := r.Read(bPerInput[i : i+1])
 			if err != nil && err != io.EOF {
 				return err
 			}
 			if n == 0 {
-				empties += 1
-				continue
+				return nil
 			}
 		}
-		if empties == len(m.inputs) {
-			return nil
-		}
 		out := make([]byte, len(m.inputs))
-		num_bit := 0
-		cur_byte := 0
-		for bit := 0; bit < 8; bit++ {
-			mask := byte(1 << bit)
-			for _, file_byte := range b {
-				bv := ((file_byte & mask) >> bit) << byte(num_bit)
-				out[cur_byte] |= bv
-				num_bit++
-				if num_bit == 8 {
-					cur_byte += 1
-					num_bit = 0
-				}
+		// bitOffOut - bit offset in output sequence of bytes
+		bitOffOut := 0
+		for bitOff := 0; bitOff < 8; bitOff++ {
+			mask := byte(1 << bitOff)
+			for _, b := range bPerInput {
+				bv := ((b & mask) >> bitOff) << byte(bitOffOut%8)
+				out[bitOffOut/8] |= bv
+				bitOffOut++
 			}
 		}
 		m.output.Write(out)
