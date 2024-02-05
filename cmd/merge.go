@@ -35,12 +35,12 @@ var mergeCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		m := merge.New(cfg.Merge)
-		err, closeFunc := m.Open(cfg.Inputs, cfg.Output)
+		err := m.Open(cfg.Inputs, cfg.Output)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer closeFunc()
-		err = m.Run(context.TODO())
+		defer m.Close()
+		err = m.Run(context.Background())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -48,20 +48,15 @@ var mergeCmd = &cobra.Command{
 }
 
 func init() {
-	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByBit, "bits", "", false, "Merge by bits in byte")
-	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByByte, "bytes", "b", false, "Merge by bytes")
-	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByWord, "words", "w", false, "Merge by word")
-	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByDword, "dwords", "d", false, "Merge by dwords")
-	mergeCmd.MarkFlagsMutuallyExclusive(mergeCmd.Flags().Args()...)
+	bits := "bits"
+	b := "bytes"
+	w := "words"
+	d := "dwords"
+	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByBit, bits, "", false, "Merge by bits in byte")
+	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByByte, b, "b", false, "Merge by bytes")
+	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByWord, w, "w", false, "Merge by word")
+	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByDword, d, "d", false, "Merge by dwords")
+	// you should choose only one flag
+	mergeCmd.MarkFlagsMutuallyExclusive(bits, b, w, d)
 	rootCmd.AddCommand(mergeCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// mergeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// mergeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
