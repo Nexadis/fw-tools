@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -56,13 +57,11 @@ func (m *Merger) Open(inputs []string, output string) error {
 }
 
 func (m *Merger) Close() error {
+	var err error
 	for _, i := range m.inputs {
-		err := i.Close()
-		if err != nil {
-			return err
-		}
+		err = errors.Join(i.Close(), err)
 	}
-	return m.output.Close()
+	return errors.Join(m.output.Close(), err)
 }
 
 func (m *Merger) Run(ctx context.Context) error {
@@ -103,34 +102,44 @@ func (m *Merger) bytes(ctx context.Context, size int) error {
 
 func (m *Merger) bits(ctx context.Context) error {
 	bPerInput := make([]byte, len(m.inputs))
+	bufIn := make([]*bufio.Reader, 0, len(m.inputs))
+	for _, r := range m.inputs {
+		bufIn = append(bufIn, bufio.NewReader(r))
+	}
+	bufOut := bufio.NewWriter(m.output)
+	defer bufOut.Flush()
 	for {
+		var err error
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		for i, r := range m.inputs {
-			n, err := r.Read(bPerInput[i : i+1])
+		for i, r := range bufIn {
+			bPerInput[i], err = r.ReadByte()
 			if err != nil && err != io.EOF {
 				return err
 			}
-			if n == 0 {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 		}
-		out := make([]byte, len(m.inputs))
 		// bitOffOut - bit offset in output sequence of bytes
 		bitOffOut := 0
+		var outByte byte = 0
 		for bitOff := 0; bitOff < 8; bitOff++ {
 			mask := byte(1 << bitOff)
 			for _, b := range bPerInput {
 				bv := ((b & mask) >> bitOff) << byte(bitOffOut%8)
-				out[bitOffOut/8] |= bv
+				outByte |= bv
+				if bitOffOut%8 == 7 {
+					bufOut.WriteByte(outByte)
+					outByte = 0
+				}
 				bitOffOut++
 			}
 		}
-		m.output.Write(out)
 	}
 
 }

@@ -52,7 +52,7 @@ func TestMerger_Run(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"Split by byte 2 files",
+			"Merge by byte 2 files",
 			func() *Merger {
 				cfg := config.Merge{
 					ByByte: true,
@@ -70,7 +70,7 @@ func TestMerger_Run(t *testing.T) {
 			false,
 		},
 		{
-			"Split by bit 2 files",
+			"Merge by bit 2 files",
 			func() *Merger {
 				cfg := config.Merge{
 					ByBit: true,

@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -40,7 +42,9 @@ var mergeCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		defer m.Close()
-		err = m.Run(context.Background())
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		err = m.Run(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}
