@@ -11,6 +11,9 @@ import (
 	"github.com/Nexadis/fw-tools/internal/config"
 )
 
+var ErrSize = errors.New("size of file is not the same")
+var ErrAlign = errors.New("invalid align of input")
+
 type Merger struct {
 	inputs []io.ReadCloser
 	output io.WriteCloser
@@ -44,12 +47,15 @@ func (m *Merger) Open(inputs []string, output string) error {
 
 		// file with alternative size
 		if size != s.Size() {
-			return fmt.Errorf("size of file is not same, problem with:%s", s.Name())
+			return fmt.Errorf("problem with %s: %w", s.Name(), ErrSize)
 		}
 		m.inputs = append(m.inputs, in)
 	}
 	if output == "" {
 		output = "merged.bin"
+	}
+	if err := m.isAlign(size); err != nil {
+		return err
 	}
 	o, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0766)
 	m.output = o
@@ -142,4 +148,18 @@ func (m *Merger) bits(ctx context.Context) error {
 		}
 	}
 
+}
+
+func (m *Merger) isAlign(size int64) error {
+	switch {
+	case m.Config.ByWord:
+		if size%2 != 0 {
+			return ErrAlign
+		}
+	case m.Config.ByDword:
+		if size%4 != 0 {
+			return ErrAlign
+		}
+	}
+	return nil
 }
