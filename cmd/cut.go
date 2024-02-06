@@ -62,7 +62,7 @@ var cutCmd = &cobra.Command{
 }
 
 func init() {
-	cutCmd.Flags().IntVarP(&cfg.Cut.Page, "page", "p", 0x400, "Page size, which will writed")
-	cutCmd.Flags().IntVarP(&cfg.Cut.Skip, "skip", "s", 0x20, "Metainfo size, which will skipped")
+	cutCmd.Flags().IntVarP(&cfg.Cut.PageSize, "page", "p", 0x400, "Page size, which will writed")
+	cutCmd.Flags().IntVarP(&cfg.Cut.SkipSize, "skip", "s", 0x20, "Metainfo size, which will skipped")
 	rootCmd.AddCommand(cutCmd)
 }

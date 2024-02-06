@@ -89,8 +89,8 @@ func TestCutter_Run(t *testing.T) {
 			func() *Cutter {
 				c := &Cutter{
 					Config: config.Cut{
-						Page: 8,
-						Skip: 4,
+						PageSize: 8,
+						SkipSize: 4,
 					},
 
 					input: io.NopCloser(bytes.NewBufferString("aaaabbbbccccddddeeeeffff")),

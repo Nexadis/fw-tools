@@ -2,6 +2,7 @@ package cut
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"strings"
@@ -31,7 +32,7 @@ func (c *Cutter) Open(input string, output string) error {
 		name, _ := strings.CutSuffix(input, ".bin")
 		output = name + "-cutted.bin"
 	}
-	fo, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0766)
+	fo, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		return err
 	}
@@ -41,10 +42,7 @@ func (c *Cutter) Open(input string, output string) error {
 
 func (c *Cutter) Close() error {
 	err := c.input.Close()
-	if err != nil {
-		return err
-	}
-	return c.output.Close()
+	return errors.Join(c.output.Close(), err)
 
 }
 
@@ -56,14 +54,14 @@ func (c *Cutter) Run(ctx context.Context) error {
 			return ctx.Err()
 		default:
 		}
-		n, err := io.CopyN(c.output, c.input, int64(c.Config.Page))
+		n, err := io.CopyN(c.output, c.input, int64(c.Config.PageSize))
 		if err != nil && err != io.EOF {
 			return err
 		}
 		if n == 0 {
 			return nil
 		}
-		io.CopyN(skip, c.input, int64(c.Config.Skip))
+		io.CopyN(skip, c.input, int64(c.Config.SkipSize))
 	}
 
 }

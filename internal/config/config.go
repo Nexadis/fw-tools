@@ -9,8 +9,8 @@ type Config struct {
 }
 
 type Cut struct {
-	Page int
-	Skip int
+	PageSize int
+	SkipSize int
 }
 
 type Merge struct {
