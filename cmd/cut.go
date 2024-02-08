@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/Nexadis/fw-tools/internal/cut"
 )
@@ -31,25 +30,13 @@ var cutCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		errgrp, ctx := errgroup.WithContext(ctx)
-		for _, input := range cfg.Inputs {
-			input := input
-			errgrp.Go(func() error {
-				c := cut.New(cfg.Cut)
-				err := c.Open(input, "")
-				if err != nil {
-					return err
-				}
-				defer c.Close()
-				err = c.Run(ctx)
-				if err != nil {
-					return err
-				}
-				return nil
-
-			})
+		c := cut.New(cfg.Cut)
+		err := c.Open(cfg.Inputs)
+		if err != nil {
+			log.Fatal(err)
 		}
-		err := errgrp.Wait()
+		defer c.Close()
+		err = c.Run(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}

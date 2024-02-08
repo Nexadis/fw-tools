@@ -39,8 +39,7 @@ func TestNew(t *testing.T) {
 
 func TestCutter_Open(t *testing.T) {
 	type args struct {
-		input  string
-		output string
+		inputs []string
 	}
 	tests := []struct {
 		name    string
@@ -50,7 +49,7 @@ func TestCutter_Open(t *testing.T) {
 	}{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.c.Open(tt.args.input, tt.args.output); (err != nil) != tt.wantErr {
+			if err := tt.c.Open(tt.args.inputs); (err != nil) != tt.wantErr {
 				t.Errorf("Cutter.Open() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -93,7 +92,7 @@ func TestCutter_Run(t *testing.T) {
 						SkipSize: 4,
 					},
 
-					input: io.NopCloser(bytes.NewBufferString("aaaabbbbccccddddeeeeffff")),
+					inputs: []io.ReadCloser{io.NopCloser(bytes.NewBufferString("aaaabbbbccccddddeeeeffff"))},
 				}
 				return c
 			},
@@ -106,7 +105,7 @@ func TestCutter_Run(t *testing.T) {
 			assert.NotNil(t, tt.prepare)
 			c := tt.prepare()
 			buf := &bytes.Buffer{}
-			c.output = NopWCloser(buf)
+			c.outputs = []io.WriteCloser{NopWCloser(buf)}
 			if err := c.Run(context.TODO()); (err != nil) != tt.wantErr {
 				t.Errorf("Cutter.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
