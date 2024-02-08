@@ -2,7 +2,6 @@ package config
 
 type Config struct {
 	Inputs []string
-	Output string
 	Cut    Cut
 	Merge  Merge
 	Swap   Swap
@@ -14,6 +13,7 @@ type Cut struct {
 }
 
 type Merge struct {
+	Output  string
 	ByBit   bool
 	ByByte  bool
 	ByWord  bool

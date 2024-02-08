@@ -37,7 +37,7 @@ var mergeCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		m := merge.New(cfg.Merge)
-		err := m.Open(cfg.Inputs, cfg.Output)
+		err := m.Open(cfg.Inputs, cfg.Merge.Output)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -56,10 +56,12 @@ func init() {
 	b := "bytes"
 	w := "words"
 	d := "dwords"
+	o := "output"
 	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByBit, bits, "", false, "Merge by bits in byte")
 	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByByte, b, "b", false, "Merge by bytes")
 	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByWord, w, "w", false, "Merge by word")
 	mergeCmd.Flags().BoolVarP(&cfg.Merge.ByDword, d, "d", false, "Merge by dwords")
+	mergeCmd.Flags().StringVarP(&cfg.Merge.Output, o, "o", "merged.bin", "Merge by dwords")
 	// you should choose only one flag
 	mergeCmd.MarkFlagsMutuallyExclusive(bits, b, w, d)
 	rootCmd.AddCommand(mergeCmd)
