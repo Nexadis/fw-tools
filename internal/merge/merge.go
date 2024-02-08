@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/Nexadis/fw-tools/internal/config"
 )
+
+var ErrSize = errors.New("size of file is not the same")
+var ErrAlign = errors.New("invalid align of input")
 
 type Merger struct {
 	inputs []io.ReadCloser
@@ -43,12 +47,15 @@ func (m *Merger) Open(inputs []string, output string) error {
 
 		// file with alternative size
 		if size != s.Size() {
-			return fmt.Errorf("size of file is not same, problem with:%s", s.Name())
+			return fmt.Errorf("problem with %s: %w", s.Name(), ErrSize)
 		}
 		m.inputs = append(m.inputs, in)
 	}
 	if output == "" {
 		output = "merged.bin"
+	}
+	if err := m.isAlign(size); err != nil {
+		return err
 	}
 	o, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY, 0766)
 	m.output = o
@@ -56,13 +63,11 @@ func (m *Merger) Open(inputs []string, output string) error {
 }
 
 func (m *Merger) Close() error {
+	var err error
 	for _, i := range m.inputs {
-		err := i.Close()
-		if err != nil {
-			return err
-		}
+		err = errors.Join(i.Close(), err)
 	}
-	return m.output.Close()
+	return errors.Join(m.output.Close(), err)
 }
 
 func (m *Merger) Run(ctx context.Context) error {
@@ -103,34 +108,58 @@ func (m *Merger) bytes(ctx context.Context, size int) error {
 
 func (m *Merger) bits(ctx context.Context) error {
 	bPerInput := make([]byte, len(m.inputs))
+	bufIn := make([]*bufio.Reader, 0, len(m.inputs))
+	for _, r := range m.inputs {
+		bufIn = append(bufIn, bufio.NewReader(r))
+	}
+	bufOut := bufio.NewWriter(m.output)
+	defer bufOut.Flush()
 	for {
+		var err error
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		for i, r := range m.inputs {
-			n, err := r.Read(bPerInput[i : i+1])
+		for i, r := range bufIn {
+			bPerInput[i], err = r.ReadByte()
 			if err != nil && err != io.EOF {
 				return err
 			}
-			if n == 0 {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 		}
-		out := make([]byte, len(m.inputs))
 		// bitOffOut - bit offset in output sequence of bytes
 		bitOffOut := 0
+		var outByte byte = 0
 		for bitOff := 0; bitOff < 8; bitOff++ {
 			mask := byte(1 << bitOff)
 			for _, b := range bPerInput {
 				bv := ((b & mask) >> bitOff) << byte(bitOffOut%8)
-				out[bitOffOut/8] |= bv
+				outByte |= bv
+				if bitOffOut%8 == 7 {
+					bufOut.WriteByte(outByte)
+					outByte = 0
+				}
 				bitOffOut++
 			}
 		}
-		m.output.Write(out)
 	}
 
+}
+
+func (m *Merger) isAlign(size int64) error {
+	switch {
+	case m.Config.ByWord:
+		if size%2 != 0 {
+			return ErrAlign
+		}
+	case m.Config.ByDword:
+		if size%4 != 0 {
+			return ErrAlign
+		}
+	}
+	return nil
 }

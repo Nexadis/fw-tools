@@ -47,5 +47,4 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rootCmd.PersistentFlags().StringVarP(&cfg.Output, "output", "o", "", "Output file for result. Stay empty if need auto generate")
 }

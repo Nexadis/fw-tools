@@ -2,18 +2,18 @@ package config
 
 type Config struct {
 	Inputs []string
-	Output string
 	Cut    Cut
 	Merge  Merge
 	Swap   Swap
 }
 
 type Cut struct {
-	Page int
-	Skip int
+	PageSize int
+	SkipSize int
 }
 
 type Merge struct {
+	Output  string
 	ByBit   bool
 	ByByte  bool
 	ByWord  bool

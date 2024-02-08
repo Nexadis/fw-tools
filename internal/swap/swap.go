@@ -10,15 +10,57 @@ import (
 	"os"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/Nexadis/fw-tools/internal/config"
 )
 
 var ErrAlign = errors.New("invalid align of input")
 
 type Swapper struct {
-	Input  string
-	Output string
-	Config config.Swap
+	inputs  []io.ReadCloser
+	outputs []io.WriteCloser
+	Config  config.Swap
+}
+
+func (s *Swapper) Open(inputs []string) error {
+	s.inputs = make([]io.ReadCloser, 0, len(inputs))
+	s.outputs = make([]io.WriteCloser, 0, len(inputs))
+	for _, i := range inputs {
+		in, err := os.Open(i)
+		if err != nil {
+			return fmt.Errorf("can't open file '%s' for swapping: %w", i, err)
+		}
+		stat, err := in.Stat()
+		if err != nil {
+			return fmt.Errorf("can't get file stat '%s' for swapping: %w", i, err)
+		}
+
+		// file with alternative size
+		err = s.checkLen(stat.Size())
+		if err != nil {
+			return fmt.Errorf("%w: %s", err, stat.Name())
+		}
+		s.inputs = append(s.inputs, in)
+		o := s.outName(i)
+		out, err := os.OpenFile(o, os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			return fmt.Errorf("can't create file '%s' for swapping: %w", o, err)
+		}
+		s.outputs = append(s.outputs, out)
+	}
+	return nil
+}
+
+func (s *Swapper) Close() error {
+	var err error
+	for _, in := range s.inputs {
+		err = errors.Join(in.Close(), err)
+	}
+	for _, out := range s.outputs {
+		err = errors.Join(out.Close(), err)
+	}
+	return err
 }
 
 func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
@@ -94,49 +136,20 @@ func (s Swapper) checkLen(size int64) error {
 
 }
 
-func (s Swapper) Run(ctx context.Context) error {
-	if s.Output == "" {
-		name, _ := strings.CutSuffix(s.Input, ".bin")
-		if s.Config.Bits {
-			name += "-bits"
-		}
-		if s.Config.Halfs {
-			name += "-halfs"
-		}
-		if s.Config.Bytes {
-			name += "-bytes"
-		}
-		if s.Config.Words {
-			name += "-words"
-		}
-		if s.Config.Dwords {
-			name += "-dwords"
-		}
-		name += ".bin"
-		s.Output = name
-	}
-	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0766)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
+func (s *Swapper) Run(ctx context.Context) error {
+	grp, ctx := errgroup.WithContext(ctx)
+	for i := 0; i < len(s.inputs); i++ {
+		in := s.inputs[i]
+		out := s.outputs[i]
 
-	finfo, _ := in.Stat()
-	err = s.checkLen(finfo.Size())
-	if err != nil {
-		return err
+		bufin := bufio.NewReader(in)
+		bufout := bufio.NewWriter(out)
+		grp.Go(func() error {
+			defer bufout.Flush()
+			return s.Swap(ctx, bufin, bufout)
+		})
 	}
-
-	out, err := os.OpenFile(s.Output, os.O_CREATE|os.O_WRONLY, 0766)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	bufin := bufio.NewReader(in)
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
-	return s.Swap(ctx, bufin, bufout)
+	return grp.Wait()
 }
 
 func InverseBits(b uint8) uint8 {
@@ -177,5 +190,27 @@ func SwapUInt(d uint64) uint64 {
 	top := (d & 0xFFFFFFFF00000000) >> 32
 	bot := (d & 0x00000000FFFFFFFF) << 32
 	return top + bot
+
+}
+
+func (s Swapper) outName(inName string) string {
+	name, _ := strings.CutSuffix(inName, ".bin")
+	if s.Config.Bits {
+		name += "-bits"
+	}
+	if s.Config.Halfs {
+		name += "-halfs"
+	}
+	if s.Config.Bytes {
+		name += "-bytes"
+	}
+	if s.Config.Words {
+		name += "-words"
+	}
+	if s.Config.Dwords {
+		name += "-dwords"
+	}
+	name += ".bin"
+	return name
 
 }

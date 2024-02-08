@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -33,16 +35,19 @@ var swapCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		for _, input := range cfg.Inputs {
-			s := swap.Swapper{
-				Input:  input,
-				Output: cfg.Output,
-				Config: cfg.Swap,
-			}
-			err := s.Run(context.TODO())
-			if err != nil {
-				log.Fatal(err)
-			}
+		s := swap.Swapper{
+			Config: cfg.Swap,
+		}
+		err := s.Open(cfg.Inputs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer s.Close()
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		err = s.Run(ctx)
+		if err != nil {
+			log.Fatal(err)
 		}
 	},
 }
@@ -56,13 +61,4 @@ func init() {
 
 	rootCmd.AddCommand(swapCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// swapCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// swapCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
