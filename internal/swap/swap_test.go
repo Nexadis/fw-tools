@@ -303,29 +303,28 @@ func TestRun(t *testing.T) {
 		},
 	}
 	inname := os.TempDir() + "/test_in.bin"
-	outname := os.TempDir() + "/test_out.bin"
 	os.Remove(inname)
-	os.Remove(outname)
 
 	for _, tn := range tests {
 		t.Run(tn.name, func(t *testing.T) {
 			defer os.Remove(inname)
-			defer os.Remove(outname)
 
 			s := Swapper{
-				Input:  inname,
-				Output: outname,
 				Config: tn.conf,
 			}
+			outname := s.outName(inname)
+			defer os.Remove(outname)
 			err := os.WriteFile(inname, tn.in, 0777)
 			require.NoError(t, err)
+			require.NoError(t, s.Open([]string{inname}))
 
-			err = s.Run(context.TODO())
+			err = s.Run(context.Background())
 			if tn.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
+			require.NoError(t, s.Close())
 			data, err := os.ReadFile(outname)
 			require.NoError(t, err)
 			assert.Equal(t, tn.out, data)
@@ -362,30 +361,31 @@ func BenchmarkRun(b *testing.B) {
 		},
 	}
 	inname := os.TempDir() + "/test_in.bin"
-	outname := os.TempDir() + "/test_out.bin"
 	os.Remove(inname)
-	os.Remove(outname)
 
-	for _, tn := range tests {
+	for _, tt := range tests {
 		sizes := []int{KiB, MiB, 10 * MiB, 100 * MiB, 1 * GiB}
 		for _, size := range sizes {
-			b.Run(fmt.Sprintf("%s_%d", tn.name, size), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%s_%d", tt.name, size), func(b *testing.B) {
 				defer os.Remove(inname)
-				defer os.Remove(outname)
 
 				f, _ := os.OpenFile(inname, os.O_CREATE|os.O_WRONLY, 0755)
-				f.Write(bytes.Repeat(tn.in, size))
+				f.Write(bytes.Repeat(tt.in, size))
 				f.Close()
+
 				s := Swapper{
-					Input:  inname,
-					Output: outname,
-					Config: tn.conf,
+					Config: tt.conf,
 				}
+				outname := s.outName(inname)
+				defer os.Remove(outname)
+
+				s.Open([]string{inname})
 				b.Log("end prepare")
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					s.Run(context.TODO())
 				}
+				s.Close()
 
 			})
 		}

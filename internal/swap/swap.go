@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/Nexadis/fw-tools/internal/config"
 )
 
@@ -27,11 +29,11 @@ func (s *Swapper) Open(inputs []string) error {
 	for _, i := range inputs {
 		in, err := os.Open(i)
 		if err != nil {
-			return fmt.Errorf("can't open file '%s' for swapping: %w", err)
+			return fmt.Errorf("can't open file '%s' for swapping: %w", i, err)
 		}
 		stat, err := in.Stat()
 		if err != nil {
-			return fmt.Errorf("can't get file stat '%s' for swapping: %w", err)
+			return fmt.Errorf("can't get file stat '%s' for swapping: %w", i, err)
 		}
 
 		// file with alternative size
@@ -41,7 +43,7 @@ func (s *Swapper) Open(inputs []string) error {
 		}
 		s.inputs = append(s.inputs, in)
 		o := s.outName(i)
-		out, err := os.OpenFile(o, os.O_CREATE|os.O_WRONLY, 0766)
+		out, err := os.OpenFile(o, os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			return fmt.Errorf("can't create file '%s' for swapping: %w", o, err)
 		}
@@ -134,29 +136,20 @@ func (s Swapper) checkLen(size int64) error {
 
 }
 
-func (s Swapper) Run(ctx context.Context) error {
-	in, err := os.OpenFile(s.Input, os.O_RDONLY, 0766)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
+func (s *Swapper) Run(ctx context.Context) error {
+	grp, ctx := errgroup.WithContext(ctx)
+	for i := 0; i < len(s.inputs); i++ {
+		in := s.inputs[i]
+		out := s.outputs[i]
 
-	finfo, _ := in.Stat()
-	err = s.checkLen(finfo.Size())
-	if err != nil {
-		return err
+		bufin := bufio.NewReader(in)
+		bufout := bufio.NewWriter(out)
+		grp.Go(func() error {
+			defer bufout.Flush()
+			return s.Swap(ctx, bufin, bufout)
+		})
 	}
-
-	out, err := os.OpenFile(s.Output, os.O_CREATE|os.O_WRONLY, 0766)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	bufin := bufio.NewReader(in)
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
-	return s.Swap(ctx, bufin, bufout)
+	return grp.Wait()
 }
 
 func InverseBits(b uint8) uint8 {
