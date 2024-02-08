@@ -42,6 +42,7 @@ var swapCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer s.Close()
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		err = s.Run(ctx)
