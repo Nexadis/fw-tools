@@ -4,31 +4,48 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"context"
+	"errors"
+	"log"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
+
+	"github.com/Nexadis/fw-tools/internal/cut"
 )
 
 // cutCmd represents the cut command
 var cutCmd = &cobra.Command{
-	Use:   "cut",
+	Use:   "cut filename",
 	Short: "Cut metainfo between pages with step",
 	Long:  `In some type of memory dumps we can meet additional meta-information about pages. You can use this command for cut it.`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("set filename")
+		}
+		cfg.Inputs = append(cfg.Inputs, args...)
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("cut called")
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		c := cut.New(cfg.Cut)
+		err := c.Open(cfg.Inputs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer c.Close()
+		err = c.Run(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 	},
 }
 
 func init() {
+	cutCmd.Flags().IntVarP(&cfg.Cut.PageSize, "page", "p", 0x400, "Page size, which will writed")
+	cutCmd.Flags().IntVarP(&cfg.Cut.SkipSize, "skip", "s", 0x20, "Metainfo size, which will skipped")
 	rootCmd.AddCommand(cutCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// cutCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// cutCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
