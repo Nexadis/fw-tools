@@ -23,6 +23,12 @@ type Swapper struct {
 	Config  config.Swap
 }
 
+func New(cfg config.Swap) *Swapper {
+	return &Swapper{
+		Config: cfg,
+	}
+}
+
 func (s *Swapper) Open(inputs []string) error {
 	s.inputs = make([]io.ReadCloser, 0, len(inputs))
 	s.outputs = make([]io.WriteCloser, 0, len(inputs))
