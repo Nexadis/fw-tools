@@ -160,9 +160,14 @@ func (s *Swapper) Run(ctx context.Context) error {
 
 func InverseBits(b uint8) uint8 {
 	var o uint8
-	for i := 0; i < 8; i++ {
-		o += ((b & (1 << i)) >> i) << (7 - i)
-	}
+	o |= (b & 0b1000_0000) >> 7
+	o |= (b & 0b0100_0000) >> 5
+	o |= (b & 0b0010_0000) >> 3
+	o |= (b & 0b0001_0000) >> 1
+	o |= (b & 0b0000_1000) << 1
+	o |= (b & 0b0000_0100) << 3
+	o |= (b & 0b0000_0010) << 5
+	o |= (b & 0b0000_0001) << 7
 	return o
 
 }
