@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -336,7 +337,9 @@ func TestRun(t *testing.T) {
 
 var Err error
 
-const dataSize = 1 << 10
+const dataSize = 1 << 20
+
+var filesCount int = runtime.GOMAXPROCS(0)
 
 type bench struct {
 	name string
@@ -356,17 +359,14 @@ func BenchmarkBits(b *testing.B) {
 		b.Run(tb.name, func(b *testing.B) {
 			s := New(tb.conf)
 			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
 			b.ResetTimer()
 			var err error
 			for i := 0; i < b.N; i++ {
-				b.StopTimer()
-				runtime.GC()
-				inbuf := make([]byte, tb.size)
-				rand.Read(inbuf)
-				outbuf := make([]byte, tb.size)
 				r := bytes.NewBuffer(inbuf)
 				w := bytes.NewBuffer(outbuf)
-				b.StartTimer()
 				err = s.swap(ctx, r, w)
 			}
 			Err = err
@@ -473,21 +473,60 @@ func BenchmarkDwords(b *testing.B) {
 		b.Run(tb.name, func(b *testing.B) {
 			s := New(tb.conf)
 			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, 0, tb.size)
 			b.ResetTimer()
 			var err error
 			for i := 0; i < b.N; i++ {
-				b.StopTimer()
-				runtime.GC()
-				inbuf := make([]byte, tb.size)
-				rand.Read(inbuf)
-				outbuf := make([]byte, tb.size)
 				r := bytes.NewBuffer(inbuf)
 				w := bytes.NewBuffer(outbuf)
-				b.StartTimer()
 				err = s.swap(ctx, r, w)
 			}
 			Err = err
 		})
 	}
 
+}
+
+func BenchmarkRun(b *testing.B) {
+	dir := os.TempDir()
+	benches := []bench{
+		{
+			"bits",
+			config.Swap{Bits: true},
+			dataSize,
+		},
+		{
+			"bytes",
+			config.Swap{Bytes: true},
+			dataSize,
+		},
+	}
+	names := make([]string, 0, filesCount)
+	for i := 0; i < filesCount; i++ {
+		names = append(names, fmt.Sprintf("%s/test-fw-tools_%d.bin", dir, i))
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			buf := make([]byte, tb.size)
+			rand.Read(buf)
+			for _, name := range names {
+				err := os.WriteFile(name, buf, 0777)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+			s := New(tb.conf)
+			ctx := context.TODO()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				s.Open(names)
+				s.Run(ctx)
+				s.Close()
+			}
+
+		})
+
+	}
 }
