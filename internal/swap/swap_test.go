@@ -3,10 +3,10 @@ package swap
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
-	"fmt"
+	"crypto/rand"
 	"io"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -183,7 +183,7 @@ func TestSwap(t *testing.T) {
 				Config: tn.conf,
 			}
 			buf := bytes.NewBuffer(make([]byte, 0, len(tn.want)))
-			err := s.Swap(context.TODO(), tn.prepare(), buf)
+			err := s.swap(context.TODO(), tn.prepare(), buf)
 			require.NoError(t, err)
 			require.Equal(t, tn.want, buf.Bytes())
 
@@ -334,149 +334,160 @@ func TestRun(t *testing.T) {
 
 }
 
-func BenchmarkRun(b *testing.B) {
-	tests := []struct {
-		name    string
-		conf    config.Swap
-		in      []byte
-		wantErr bool
-	}{
+var Err error
+
+const dataSize = 1 << 10
+
+type bench struct {
+	name string
+	conf config.Swap
+	size int
+}
+
+func BenchmarkBits(b *testing.B) {
+	benches := []bench{
 		{
-			"Bench byte file",
-			config.Swap{
-				Bits:  true,
-				Halfs: true,
-			},
-			[]byte{0b1010_1011},
-			false,
-		},
-		{
-			"Bench word and dword file",
-			config.Swap{
-				Bytes: true,
-				Words: true,
-			},
-			[]byte{0xAD},
-			false,
+			"bits",
+			config.Swap{Bits: true},
+			dataSize,
 		},
 	}
-	inname := os.TempDir() + "/test_in.bin"
-	os.Remove(inname)
-
-	for _, tt := range tests {
-		sizes := []int{KiB, MiB, 10 * MiB, 100 * MiB, 1 * GiB}
-		for _, size := range sizes {
-			b.Run(fmt.Sprintf("%s_%d", tt.name, size), func(b *testing.B) {
-				defer os.Remove(inname)
-
-				f, _ := os.OpenFile(inname, os.O_CREATE|os.O_WRONLY, 0755)
-				f.Write(bytes.Repeat(tt.in, size))
-				f.Close()
-
-				s := Swapper{
-					Config: tt.conf,
-				}
-				outname := s.outName(inname)
-				defer os.Remove(outname)
-
-				s.Open([]string{inname})
-				b.Log("end prepare")
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					s.Run(context.TODO())
-				}
-				s.Close()
-
-			})
-		}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				runtime.GC()
+				inbuf := make([]byte, tb.size)
+				rand.Read(inbuf)
+				outbuf := make([]byte, tb.size)
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
 	}
 
 }
-
-func BenchmarkSwapDwords(b *testing.B) {
-	tests := []struct {
-		name string
-		size int
-	}{
+func BenchmarkHalfs(b *testing.B) {
+	benches := []bench{
 		{
-			"Byte slice Swap 1MiB",
-			1 * MiB,
-		},
-		{
-			"Byte slice Swap 100MiB",
-			100 * MiB,
-		},
-		{
-			"Byte slice Swap 1GiB",
-			1 * GiB,
+			"halfs",
+			config.Swap{Halfs: true},
+			dataSize,
 		},
 	}
-	for _, tn := range tests {
-		b.Run(tn.name, func(b *testing.B) {
-			data := bytes.Repeat([]byte{0xFA}, tn.size)
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
 			b.ResetTimer()
+			var err error
 			for i := 0; i < b.N; i++ {
-				SwapDwords(data)
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
 			}
-
+			Err = err
 		})
 	}
-	utests := []struct {
-		name     string
-		sizeFile int
-		bufSize  int
-	}{
+
+}
+func BenchmarkBytes(b *testing.B) {
+	benches := []bench{
 		{
-			"Uint Swap 1MiB",
-			1 * MiB,
-			8,
-		},
-		{
-			"Uint Swap 100MiB",
-			100 * MiB,
-			8,
-		},
-		{
-			"Uint Swap 1GiB buf=8",
-			1 * GiB,
-			0x8,
-		},
-		{
-			"Uint Swap 1GiB buf=0x100",
-			1 * GiB,
-			0x100,
-		},
-		{
-			"Uint Swap 1GiB buf=0x400",
-			1 * GiB,
-			0x400,
-		},
-		{
-			"Uint Swap 1GiB buf=0x1000",
-			1 * GiB,
-			0x1000,
+			"bytes",
+			config.Swap{Bytes: true},
+			dataSize,
 		},
 	}
-	for _, tn := range utests {
-		b.Run(tn.name, func(b *testing.B) {
-			data := bytes.Repeat([]byte{0xFA}, tn.sizeFile)
-			r := bytes.NewReader(data)
-			buf := make([]byte, tn.bufSize)
-
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
 			b.ResetTimer()
+			var err error
 			for i := 0; i < b.N; i++ {
-				for n, err := r.Read(buf); n != 0; n, err = r.Read(buf) {
-					if err != nil && err != io.EOF {
-						return
-					}
-					var w uint64
-					for i := 0; i < len(buf); i += 8 {
-						w = binary.BigEndian.Uint64(buf[i : i+8])
-						w = SwapUInt(w)
-						binary.BigEndian.PutUint64(buf[i:i+8], w)
-					}
-				}
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
 			}
+			Err = err
 		})
 	}
+
+}
+func BenchmarkWords(b *testing.B) {
+	benches := []bench{
+		{
+			"words",
+			config.Swap{Words: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
+	}
+
+}
+func BenchmarkDwords(b *testing.B) {
+	benches := []bench{
+		{
+			"dwords",
+			config.Swap{Dwords: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				runtime.GC()
+				inbuf := make([]byte, tb.size)
+				rand.Read(inbuf)
+				outbuf := make([]byte, tb.size)
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
+	}
+
 }
