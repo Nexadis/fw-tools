@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"io"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -182,7 +183,7 @@ func TestSwap(t *testing.T) {
 				Config: tn.conf,
 			}
 			buf := bytes.NewBuffer(make([]byte, 0, len(tn.want)))
-			err := s.Swap(context.TODO(), tn.prepare(), buf)
+			err := s.swap(context.TODO(), tn.prepare(), buf)
 			require.NoError(t, err)
 			require.Equal(t, tn.want, buf.Bytes())
 
@@ -335,39 +336,23 @@ func TestRun(t *testing.T) {
 
 var Err error
 
-func BenchmarkSwap(b *testing.B) {
-	const dataSize = 1 << 10
-	type test struct {
-		name string
-		conf config.Swap
-	}
-	tests := []test{
+const dataSize = 1 << 10
+
+type bench struct {
+	name string
+	conf config.Swap
+	size int
+}
+
+func BenchmarkBits(b *testing.B) {
+	benches := []bench{
 		{
 			"bits",
 			config.Swap{Bits: true},
-		},
-		{
-			"bytes",
-			config.Swap{Bytes: true},
-		},
-		{
-			"halfs",
-			config.Swap{Halfs: true},
-		},
-		{
-			"words",
-			config.Swap{Words: true},
-		},
-		{
-			"dwords",
-			config.Swap{Dwords: true},
-		},
-		{
-			"bits&bytes",
-			config.Swap{Bits: true, Bytes: true},
+			dataSize,
 		},
 	}
-	for _, tb := range tests {
+	for _, tb := range benches {
 		b.Run(tb.name, func(b *testing.B) {
 			s := New(tb.conf)
 			ctx := context.TODO()
@@ -375,16 +360,133 @@ func BenchmarkSwap(b *testing.B) {
 			var err error
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				inbuf := make([]byte, dataSize)
+				runtime.GC()
+				inbuf := make([]byte, tb.size)
 				rand.Read(inbuf)
+				outbuf := make([]byte, tb.size)
 				r := bytes.NewBuffer(inbuf)
-				outbuf := make([]byte, dataSize)
 				w := bytes.NewBuffer(outbuf)
 				b.StartTimer()
-				err = s.Swap(ctx, r, w)
+				err = s.swap(ctx, r, w)
 			}
 			Err = err
+		})
+	}
 
+}
+func BenchmarkHalfs(b *testing.B) {
+	benches := []bench{
+		{
+			"halfs",
+			config.Swap{Halfs: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
+	}
+
+}
+func BenchmarkBytes(b *testing.B) {
+	benches := []bench{
+		{
+			"bytes",
+			config.Swap{Bytes: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
+	}
+
+}
+func BenchmarkWords(b *testing.B) {
+	benches := []bench{
+		{
+			"words",
+			config.Swap{Words: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			inbuf := make([]byte, tb.size)
+			rand.Read(inbuf)
+			outbuf := make([]byte, tb.size)
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
+		})
+	}
+
+}
+func BenchmarkDwords(b *testing.B) {
+	benches := []bench{
+		{
+			"dwords",
+			config.Swap{Dwords: true},
+			dataSize,
+		},
+	}
+	for _, tb := range benches {
+		b.Run(tb.name, func(b *testing.B) {
+			s := New(tb.conf)
+			ctx := context.TODO()
+			b.ResetTimer()
+			var err error
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				runtime.GC()
+				inbuf := make([]byte, tb.size)
+				rand.Read(inbuf)
+				outbuf := make([]byte, tb.size)
+				r := bytes.NewBuffer(inbuf)
+				w := bytes.NewBuffer(outbuf)
+				b.StartTimer()
+				err = s.swap(ctx, r, w)
+			}
+			Err = err
 		})
 	}
 
