@@ -69,7 +69,7 @@ func (s *Swapper) Close() error {
 	return err
 }
 
-func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
+func (s *Swapper) swap(ctx context.Context, i io.Reader, o io.Writer) error {
 	buf := make([]byte, 0x10)
 	for n, err := i.Read(buf); n != 0; n, err = i.Read(buf) {
 		if err != nil && err != io.EOF {
@@ -95,7 +95,7 @@ func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
 
 		if s.Config.Bytes {
 			var w uint16
-			for i := 0; i < len(buf); i += 2 {
+			for i := 0; i < n; i += 2 {
 				w = binary.BigEndian.Uint16(buf[i : i+2])
 				w = SwapBytes(w)
 				binary.BigEndian.PutUint16(buf[i:i+2], w)
@@ -104,7 +104,7 @@ func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
 
 		if s.Config.Words {
 			var w uint32
-			for i := 0; i < len(buf); i += 4 {
+			for i := 0; i < n; i += 4 {
 				w = binary.BigEndian.Uint32(buf[i : i+4])
 				w = SwapWords(w)
 				binary.BigEndian.PutUint32(buf[i:i+4], w)
@@ -113,7 +113,7 @@ func (s Swapper) Swap(ctx context.Context, i io.Reader, o io.Writer) error {
 
 		if s.Config.Dwords {
 			var w uint64
-			for i := 0; i < len(buf); i += 8 {
+			for i := 0; i < n; i += 8 {
 				w = binary.BigEndian.Uint64(buf[i : i+8])
 				w = SwapUInt(w)
 				binary.BigEndian.PutUint64(buf[i:i+8], w)
@@ -152,7 +152,7 @@ func (s *Swapper) Run(ctx context.Context) error {
 		bufout := bufio.NewWriter(out)
 		grp.Go(func() error {
 			defer bufout.Flush()
-			return s.Swap(ctx, bufin, bufout)
+			return s.swap(ctx, bufin, bufout)
 		})
 	}
 	return grp.Wait()
