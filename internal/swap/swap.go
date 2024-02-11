@@ -70,7 +70,7 @@ func (s *Swapper) Close() error {
 }
 
 func (s *Swapper) swap(ctx context.Context, i io.Reader, o io.Writer) error {
-	buf := make([]byte, 0x10)
+	buf := make([]byte, 0x400)
 	for n, err := i.Read(buf); n != 0; n, err = i.Read(buf) {
 		if err != nil && err != io.EOF {
 			return err
